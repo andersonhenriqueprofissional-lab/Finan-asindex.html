@@ -1,148 +1,158 @@
-// Script para o Dashboard de Resumos
+// ==========================================
+// 1. GERENCIADOR DE ESTADO & INICIALIZAÇÃO
+// ==========================================
 
-// Elementos do DOM para exibir os totais
+// Inicializa a aplicação ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    inicializarGerenciadorEstado();
+    inicializarFiltroCompetencia();
+    inicializarSistemaAbas();
+});
+
+function inicializarGerenciadorEstado() {
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Ordena os lançamentos por data (mais recentes primeiro)
+    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+}
+
+// ==========================================
+// 2. DASHBOARD DE RESUMOS
+// ==========================================
+
 const totalRecebidoCard = document.getElementById('totalRecebido');
 const totalContasCard = document.getElementById('totalContas');
 const totalMetasCard = document.getElementById('totalMetas');
-const saldoRestanteCard = document.getElementById('saldoRestante');
-const saldoRestanteValorSpan = document.getElementById('saldoRestanteValor'); // Para mudar a cor
+const saldoRestanteValorSpan = document.getElementById('saldoRestanteValor');
 
-// Função para buscar e exibir os dados do resumo
-async function atualizarResumo() {
-    // Simula a busca de dados dinâmicos (substitua por sua lógica de busca real)
-    const dadosResumo = await buscarDadosFinanceiros();
-
-    // Atualiza os cards com os dados recebidos
-    totalRecebidoCard.innerText = formatarMoeda(dadosResumo.totalRecebido);
-    totalContasCard.innerText = formatarMoeda(dadosResumo.totalContas);
-    totalMetasCard.innerText = formatarMoeda(dadosResumo.totalMetas);
-
-    const saldoLiquido = dadosResumo.totalRecebido - dadosResumo.totalContas - dadosResumo.totalMetas;
-    saldoRestanteValorSpan.innerText = formatarMoeda(saldoLiquido);
-
-    // Altera a cor do saldo restante com base no valor
-    if (saldoLiquido >= 0) {
-        saldoRestanteValorSpan.style.color = 'green'; // Cor para positivo
-    } else {
-        saldoRestanteValorSpan.style.color = 'red'; // Cor para negativo
-    }
-}
-
-// Função auxiliar para formatar valores como moeda brasileira
 function formatarMoeda(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Função simulada para buscar dados financeiros (substitua pela sua implementação real)
-async function buscarDadosFinanceiros() {
-    // Em um aplicativo real, você buscaria estes dados do localStorage, banco de dados, API, etc.
-    // Aqui, retornamos valores simulados para demonstração.
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve({
-                totalRecebido: 5000.50,
-                totalContas: 2500.75,
-                totalMetas: 1000.00
-            });
-        }, 500); // Simula um pequeno atraso de rede
+// Atualiza os cards com base nos dados que estão atualmente renderizados/filtrados
+function atualizarResumo(lancamentosVisiveis) {
+    let totalRecebido = 0;
+    let totalContas = 0;
+    let totalMetas = 0;
+
+    lancamentosVisiveis.forEach(l => {
+        const valor = parseFloat(l.valor) || 0;
+        if (l.tipo.startsWith('receita')) {
+            totalRecebido += valor;
+        } else if (l.tipo.startsWith('pagamento')) {
+            totalContas += valor;
+        } else if (l.tipo === 'meta' || l.tipo === 'investimento') {
+            totalMetas += valor;
+        }
+    });
+
+    if (totalRecebidoCard) totalRecebidoCard.innerText = formatarMoeda(totalRecebido);
+    if (totalContasCard) totalContasCard.innerText = formatarMoeda(totalContas);
+    if (totalMetasCard) totalMetasCard.innerText = formatarMoeda(totalMetas);
+
+    const saldoLiquido = totalRecebido - totalContas - totalMetas;
+    
+    if (saldoRestanteValorSpan) {
+        saldoRestanteValorSpan.innerText = formatarMoeda(saldoLiquido);
+        saldoRestanteValorSpan.style.color = saldoLiquido >= 0 ? 'green' : 'red';
+    }
+}
+
+// ==========================================
+// 3. FORMULÁRIO E SUBMISSÃO DE LANÇAMENTOS
+// ==========================================
+
+const formLancamento = document.getElementById('formLancamento');
+
+if (formLancamento) {
+    formLancamento.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const editingId = parseInt(this.dataset.editingId);
+        
+        if (!isNaN(editingId)) {
+            salvarEdicaoLancamento(editingId);
+        } else {
+            const inputDescricao = document.getElementById('descricaoLancamento');
+            const inputValor = document.getElementById('valorLancamento');
+            const selectTipo = document.getElementById('tipoLancamento');
+            const inputData = document.getElementById('dataLancamento');
+            const inputCategoria = document.getElementById('categoriaLancamento');
+
+            const novoLancamento = {
+                id: Date.now(),
+                descricao: inputDescricao.value,
+                valor: parseFloat(inputValor.value.replace(',', '.')),
+                tipo: selectTipo.value,
+                data: inputData.value,
+                categoria: inputCategoria.value,
+                status: 'pendente'
+            };
+
+            adicionarLancamento(novoLancamento);
+            this.reset();
+            inputDescricao.focus();
+        }
     });
 }
 
-// Chama a função para atualizar o resumo ao carregar a página
-document.addEventListener('DOMContentLoaded', atualizarResumo);
-// Script para o Sistema de Lançamentos Flexível
-
-// Elementos do DOM para o formulário de lançamento
-const formLancamento = document.getElementById('formLancamento');
-const inputDescricao = document.getElementById('descricaoLancamento');
-const inputValor = document.getElementById('valorLancamento');
-const selectTipo = document.getElementById('tipoLancamento');
-const inputData = document.getElementById('dataLancamento');
-const inputCategoria = document.getElementById('categoriaLancamento'); // Adicionado campo de categoria
-
-// Adiciona um listener para o evento de submit do formulário
-formLancamento.addEventListener('submit', function(event) {
-    event.preventDefault(); // Impede o comportamento padrão de submissão do formulário
-
-    // Cria um objeto com os dados do lançamento
-    const novoLancamento = {
-        id: Date.now(), // Gera um ID único baseado no timestamp
-        descricao: inputDescricao.value,
-        valor: parseFloat(inputValor.value.replace(',', '.')), // Converte para número, tratando vírgula como decimal
-        tipo: selectTipo.value, // 'receita_fixa', 'receita_extra', 'pagamento_fixo', 'pagamento_mes', 'pagamento_avulso', 'meta', 'investimento'
-        data: inputData.value,
-        categoria: inputCategoria.value, // Captura o valor da categoria
-        status: 'pendente' // Status inicial padrão
-    };
-
-    // Adiciona o novo lançamento à lista (substitua por sua lógica de persistência)
-    adicionarLancamento(novoLancamento);
-
-    // Limpa o formulário após o lançamento
-    formLancamento.reset();
-    // Opcionalmente, pode redefinir o foco para o primeiro campo
-    inputDescricao.focus();
-});
-
-// Função para adicionar um lançamento à lista (exemplo com localStorage)
 function adicionarLancamento(lancamento) {
-    // Busca os lançamentos existentes no localStorage
     let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Adiciona o novo lançamento ao array
     lancamentos.push(lancamento);
-    // Salva a lista atualizada de volta no localStorage
     localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-    // Atualiza a exibição da tabela de lançamentos (função a ser implementada)
-    renderizarTabelaLancamentos();
+    
+    // Força a atualização da tabela respeitando o filtro atual
+    const inputCompetencia = document.getElementById('filtroCompetencia');
+    if (inputCompetencia && inputCompetencia.value) {
+        filtrarLancamentosPorCompetencia(inputCompetencia.value);
+    } else {
+        renderizarTabelaFiltrada(lancamentos);
+    }
 }
 
-// Função para inicializar a renderização da tabela ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
-    renderizarTabelaLancamentos();
-});
+// ==========================================
+// 4. RENDERIZAÇÃO DA TABELA E STATUS
+// ==========================================
 
-// Função simulada para renderizar a tabela de lançamentos (precisa ser implementada com base nos dados reais)
-function renderizarTabelaLancamentos() {
-    const tabelaBody = document.getElementById('tabelaLancamentosBody'); // Assumindo que há um tbody com este ID
-    if (!tabelaBody) return; // Sai se o elemento não for encontrado
+const tabelaLancamentosBody = document.getElementById('tabelaLancamentosBody');
 
-    tabelaBody.innerHTML = ''; // Limpa o conteúdo atual da tabela
+function renderizarTabelaFiltrada(lancamentosParaRenderizar) {
+    if (!tabelaLancamentosBody) return;
+    tabelaLancamentosBody.innerHTML = '';
 
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Ordena por data (mais recentes primeiro)
+    lancamentosParaRenderizar.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-    // Ordena os lançamentos por data (mais recentes primeiro)
-    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
-
-    lancamentos.forEach(lancamento => {
-        const linha = tabelaBody.insertRow();
+    lancamentosParaRenderizar.forEach(lancamento => {
+        const linha = tabelaLancamentosBody.insertRow();
+        linha.dataset.lancamentoId = lancamento.id;
 
         const dataCell = linha.insertCell();
-        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
+        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
 
         const descricaoCell = linha.insertCell();
         descricaoCell.textContent = lancamento.descricao;
 
         const categoriaCell = linha.insertCell();
-        categoriaCell.textContent = lancamento.categoria || '-'; // Exibe '-' se não houver categoria
+        categoriaCell.textContent = lancamento.categoria || '-';
 
         const tipoCell = linha.insertCell();
-        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
+        tipoCell.textContent = lancamento.tipo.replace('_', ' ');
 
         const valorCell = linha.insertCell();
         const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         valorCell.textContent = valorFormatado;
-        // Adiciona cor ao valor se for despesa
+
         if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
             valorCell.style.color = 'red';
         } else {
             valorCell.style.color = 'green';
         }
 
-        const statusCell = linha.insertCell();
-        // Adiciona botões visuais para status
-        statusCell.innerHTML = getStatusButtonHTML(lancamento.status);
+        // Renderiza o botão de status
+        renderizarBotoesStatus(lancamento, linha);
 
-        // Adiciona botões de ação (editar, excluir, duplicar)
+        // Ações
         const acoesCell = linha.insertCell();
         acoesCell.innerHTML = `
             <button onclick="editarLancamento(${lancamento.id})">✏️</button>
@@ -150,383 +160,42 @@ function renderizarTabelaLancamentos() {
             <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
         `;
     });
+
+    // Atualiza o dashboard com os dados que estão visíveis na tela
+    atualizarResumo(lancamentosParaRenderizar);
 }
 
-// Função para obter o HTML do botão de status
-function getStatusButtonHTML(status) {
-    switch(status) {
-        case 'concluido':
-            return '<button class="status-btn 🟢" onclick="alterarStatus(event)">Concluído</button>';
-        case 'pendente':
-            return '<button class="status-btn 🟡" onclick="alterarStatus(event)">Pendente</button>';
-        case 'atrasado':
-            return '<button class="status-btn 🔴" onclick="alterarStatus(event)">Atrasado</button>';
-        default:
-            return '<button class="status-btn 🟡" onclick="alterarStatus(event)">Pendente</button>';
-    }
-}
-
-// Função placeholder para alterar status (precisa ser implementada com base no evento)
-function alterarStatus(event) {
-    const button = event.target;
-    const currentRow = button.closest('tr');
-    const statusText = button.textContent;
-
-    let newStatus = '';
-    let newStatusClass = '';
-    let newStatusButtonText = '';
-
-    switch(statusText) {
-        case 'Concluído':
-            newStatus = 'pendente';
-            newStatusButtonText = 'Pendente';
-            newStatusClass = '🟡';
-            break;
-        case 'Pendente':
-            newStatus = 'atrasado';
-            newStatusButtonText = 'Atrasado';
-            newStatusClass = '🔴';
-            break;
-        case 'Atrasado':
-            newStatus = 'concluido';
-            newStatusButtonText = 'Concluído';
-            newStatusClass = '🟢';
-            break;
-        default:
-            newStatus = 'pendente';
-            newStatusButtonText = 'Pendente';
-            newStatusClass = '🟡';
-    }
-
-    // Atualiza o botão visualmente
-    button.textContent = newStatusButtonText;
-    button.className = `status-btn ${newStatusClass}`; // Atualiza a classe para mudar o ícone/cor
-
-    // TODO: Atualizar o status no localStorage para o lançamento correspondente
-    // Você precisará obter o ID do lançamento a partir da linha da tabela (currentRow)
-    // e então atualizar o objeto no array 'lancamentos' antes de salvá-lo.
-    console.log(`Status alterado para: ${newStatus}`);
-}
-
-// Funções placeholder para editar, excluir e duplicar lançamentos (precisam ser implementadas)
-function editarLancamento(id) {
-    alert(`Editar lançamento com ID: ${id}`);
-    // Lógica para carregar os dados do lançamento no formulário para edição
-}
-
-function excluirLancamento(id) {
-    alert(`Excluir lançamento com ID: ${id}`);
-    // Lógica para remover o lançamento do localStorage e atualizar a tabela
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    lancamentos = lancamentos.filter(lancamento => lancamento.id !== id);
-    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-    renderizarTabelaLancamentos(); // Atualiza a tabela
-}
-
-function duplicarLancamento(id) {
-    alert(`Duplicar lançamento com ID: ${id}`);
-    // Lógica para clonar o lançamento para o mês seguinte com status padrão pendente
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
-
-    if (lancamentoOriginal) {
-        const dataOriginal = new Date(lancamentoOriginal.data);
-        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
-
-        const novoLancamentoDuplicado = {
-            ...lancamentoOriginal, // Copia todas as propriedades do original
-            id: Date.now() + Math.random(), // Novo ID para evitar conflitos
-            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês
-            status: 'pendente' // Define o status padrão como pendente
-        };
-
-        lancamentos.push(novoLancamentoDuplicado);
-        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-        renderizarTabelaLancamentos(); // Atualiza a tabela
-    }
-}
-// Script para o Gerenciador de Estado Interativo
-
-// Função para inicializar o gerenciador de estado (ex: carregar dados do localStorage)
-function inicializarGerenciadorEstado() {
-    // Busca os lançamentos existentes no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-
-    // Ordena os lançamentos por data (mais recentes primeiro)
-    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
-
-    // Salva a lista ordenada de volta no localStorage
-    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-
-    // Renderiza a tabela de lançamentos inicial
-    renderizarTabelaLancamentos(); // Certifica-se que esta função está acessível
-}
-
-// Função para adicionar um novo lançamento (deve ser chamada por outros scripts, como o de Lançamentos)
-function adicionarLancamento(lancamento) {
-    // Busca os lançamentos existentes no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Adiciona o novo lançamento ao array
-    lancamentos.push(lancamento);
-    // Salva a lista atualizada de volta no localStorage
-    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-    // Atualiza a exibição da tabela de lançamentos
-    renderizarTabelaLancamentos();
-}
-
-// Função para editar um lançamento existente
-function editarLancamento(id) {
-    // Busca os lançamentos do localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Encontra o índice do lançamento a ser editado
-    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === id);
-
-    if (indiceLancamento !== -1) {
-        const lancamentoParaEditar = lancamentos[indiceLancamento];
-
-        // Preenche o formulário de lançamento com os dados do lançamento selecionado
-        document.getElementById('descricaoLancamento').value = lancamentoParaEditar.descricao;
-        document.getElementById('valorLancamento').value = lancamentoParaEditar.valor.toFixed(2).replace('.', ','); // Formata para exibição
-        document.getElementById('tipoLancamento').value = lancamentoParaEditar.tipo;
-        document.getElementById('dataLancamento').value = lancamentoParaEditar.data;
-        document.getElementById('categoriaLancamento').value = lancamentoParaEditar.categoria || ''; // Preenche a categoria
-
-        // Opcional: Mudar o botão de submit para "Atualizar" e armazenar o ID
-        const form = document.getElementById('formLancamento');
-        form.dataset.editingId = id; // Armazena o ID do lançamento sendo editado
-        const submitButton = form.querySelector('button[type="submit"]');
-        submitButton.textContent = 'Atualizar Lançamento';
-
-        // Atualiza a exibição da tabela (para remover o lançamento temporariamente ou marcá-lo)
-        // renderizarTabelaLancamentos(); // Pode ser necessário remover o item da tabela enquanto edita
-    } else {
-        alert('Lançamento não encontrado para edição.');
-    }
-}
-
-// Função para salvar as alterações de um lançamento editado
-function salvarEdicaoLancamento() {
-    const form = document.getElementById('formLancamento');
-    const id = parseInt(form.dataset.editingId); // Recupera o ID do lançamento sendo editado
-
-    if (isNaN(id)) {
-        alert('Erro ao salvar: Nenhum lançamento selecionado para edição.');
-        return;
-    }
-
-    // Coleta os novos dados do formulário
-    const descricao = document.getElementById('descricaoLancamento').value;
-    const valor = parseFloat(document.getElementById('valorLancamento').value.replace(',', '.'));
-    const tipo = document.getElementById('tipoLancamento').value;
-    const data = document.getElementById('dataLancamento').value;
-    const categoria = document.getElementById('categoriaLancamento').value;
-
-    // Busca os lançamentos existentes no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Encontra o índice do lançamento a ser atualizado
-    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === id);
-
-    if (indiceLancamento !== -1) {
-        // Atualiza os dados do lançamento
-        lancamentos[indiceLancamento] = {
-            ...lancamentos[indiceLancamento], // Mantém outras propriedades (como status, ID)
-            descricao: descricao,
-            valor: valor,
-            tipo: tipo,
-            data: data,
-            categoria: categoria
-        };
-
-        // Salva a lista atualizada de volta no localStorage
-        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-
-        // Limpa o estado de edição e reseta o formulário
-        form.dataset.editingId = '';
-        form.reset();
-        const submitButton = form.querySelector('button[type="submit"]');
-        submitButton.textContent = 'Adicionar Lançamento';
-
-        // Re-renderiza a tabela para mostrar as alterações
-        renderizarTabelaLancamentos();
-    } else {
-        alert('Erro ao salvar: Lançamento não encontrado.');
-    }
-}
-
-
-// Função para excluir um lançamento
-function excluirLancamento(id) {
-    // Confirmação antes de excluir
-    if (!confirm('Tem certeza que deseja excluir este lançamento?')) {
-        return; // Cancela a exclusão se o usuário não confirmar
-    }
-
-    // Busca os lançamentos existentes no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Filtra o array, removendo o lançamento com o ID especificado
-    const lancamentosAtualizados = lancamentos.filter(lancamento => lancamento.id !== id);
-    // Salva a lista atualizada de volta no localStorage
-    localStorage.setItem('lancamentos', JSON.stringify(lancamentosAtualizados));
-    // Atualiza a exibição da tabela de lançamentos
-    renderizarTabelaLancamentos();
-}
-
-// Função para alterar o status de um lançamento (🟢, 🟡, 🔴)
-function alterarStatus(event) {
-    const button = event.target;
-    const currentRow = button.closest('tr');
-    const statusText = button.textContent;
-    const lancamentoId = parseInt(currentRow.dataset.lancamentoId); // Assumindo que você adicionou data-lancamento-id na linha da tabela
-
-    let novoStatus = '';
-    let novoStatusButtonText = '';
-    let novoStatusClass = '';
-
-    // Determina o novo status com base no status atual
-    switch(statusText) {
-        case 'Concluído':
-            novoStatus = 'pendente';
-            novoStatusButtonText = 'Pendente';
-            novoStatusClass = '🟡';
-            break;
-        case 'Pendente':
-            novoStatus = 'atrasado';
-            novoStatusButtonText = 'Atrasado';
-            novoStatusClass = '🔴';
-            break;
-        case 'Atrasado':
-            novoStatus = 'concluido';
-            novoStatusButtonText = 'Concluído';
-            novoStatusClass = '🟢';
-            break;
-        default: // Caso o status não seja reconhecido, volta para pendente
-            novoStatus = 'pendente';
-            novoStatusButtonText = 'Pendente';
-            novoStatusClass = '🟡';
-    }
-
-    // Atualiza o botão visualmente
-    button.textContent = novoStatusButtonText;
-    button.className = `status-btn ${novoStatusClass}`; // Atualiza a classe para mudar o ícone/cor
-
-    // Atualiza o status no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === lancamentoId);
-
-    if (indiceLancamento !== -1) {
-        lancamentos[indiceLancamento].status = novoStatus;
-        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-    } else {
-        alert('Erro ao atualizar status: Lançamento não encontrado.');
-    }
-}
-
-// Função para duplicar um lançamento para o mês seguinte
-function duplicarLancamento(id) {
-    // Busca os lançamentos existentes no localStorage
-    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Encontra o lançamento original a ser duplicado
-    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
-
-    if (lancamentoOriginal) {
-        const dataOriginal = new Date(lancamentoOriginal.data);
-        // Calcula a data para o próximo mês
-        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
-
-        // Cria um novo objeto de lançamento com base no original
-        const novoLancamentoDuplicado = {
-            ...lancamentoOriginal, // Copia todas as propriedades do original
-            id: Date.now() + Math.random(), // Gera um novo ID único
-            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês no formato YYYY-MM-DD
-            status: 'pendente' // Define o status padrão como pendente
-        };
-
-        // Adiciona o novo lançamento à lista
-        lancamentos.push(novoLancamentoDuplicado);
-        // Salva a lista atualizada no localStorage
-        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-        // Atualiza a exibição da tabela
-        renderizarTabelaLancamentos();
-        alert('Lançamento duplicado para o próximo mês!');
-    } else {
-        alert('Lançamento não encontrado para duplicação.');
-    }
-}
-
-// Inicializa o gerenciador de estado ao carregar a página
-document.addEventListener('DOMContentLoaded', inicializarGerenciadorEstado);
-
-// Ouve o evento de 'submit' do formulário para adicionar ou atualizar lançamentos
-document.getElementById('formLancamento').addEventListener('submit', function(event) {
-    event.preventDefault(); // Impede o comportamento padrão do formulário
-
-    const editingId = parseInt(this.dataset.editingId); // Verifica se estamos em modo de edição
-
-    if (!isNaN(editingId)) {
-        // Se estamos editando, chama a função para salvar as alterações
-        salvarEdicaoLancamento();
-    } else {
-        // Se não estamos editando, adiciona um novo lançamento
-        const inputDescricao = document.getElementById('descricaoLancamento');
-        const inputValor = document.getElementById('valorLancamento');
-        const selectTipo = document.getElementById('tipoLancamento');
-        const inputData = document.getElementById('dataLancamento');
-        const inputCategoria = document.getElementById('categoriaLancamento');
-
-        const novoLancamento = {
-            id: Date.now(), // Gera um ID único
-            descricao: inputDescricao.value,
-            valor: parseFloat(inputValor.value.replace(',', '.')), // Converte para número
-            tipo: selectTipo.value,
-            data: inputData.value,
-            categoria: inputCategoria.value,
-            status: 'pendente' // Status inicial
-        };
-
-        adicionarLancamento(novoLancamento); // Chama a função de adicionar
-        this.reset(); // Limpa o formulário
-        inputDescricao.focus(); // Define o foco no campo de descrição
-    }
-});
-// Script para o Controle Dinâmico de Status (Clique Rápido)
-
-// Função para renderizar os botões de status na tabela
 function renderizarBotoesStatus(lancamento, linha) {
     const statusCell = linha.insertCell();
     const statusButton = document.createElement('button');
-    statusButton.className = `status-btn`; // Classe base para estilização
+    statusButton.className = `status-btn`;
 
-    // Define o texto e a classe com base no status atual
     switch (lancamento.status) {
         case 'concluido':
             statusButton.textContent = 'Concluído';
             statusButton.classList.add('🟢');
             break;
-        case 'pendente':
-            statusButton.textContent = 'Pendente';
-            statusButton.classList.add('🟡');
-            break;
         case 'atrasado':
             statusButton.textContent = 'Atrasado';
             statusButton.classList.add('🔴');
             break;
-        default: // Status padrão se não especificado
+        case 'pendente':
+default:
             statusButton.textContent = 'Pendente';
             statusButton.classList.add('🟡');
-            lancamento.status = 'pendente'; // Garante que o status seja consistente no array
+            lancamento.status = 'pendente';
+            break;
     }
 
-    // Adiciona o listener de evento de clique ao botão
     statusButton.onclick = (event) => {
-        event.stopPropagation(); // Impede que o clique no botão dispare outros eventos da linha
-        alterarStatus(event, lancamento.id); // Chama a função para alterar o status, passando o ID do lançamento
+        event.stopPropagation();
+        alterarStatusCiclo(event, lancamento.id);
     };
 
     statusCell.appendChild(statusButton);
 }
 
-// Função para alterar o status de um lançamento
-function alterarStatus(event, lancamentoId) {
+function alterarStatusCiclo(event, lancamentoId) {
     const button = event.target;
     const statusAtual = button.textContent;
 
@@ -534,7 +203,6 @@ function alterarStatus(event, lancamentoId) {
     let novoStatusButtonText = '';
     let novoStatusClass = '';
 
-    // Determina o próximo status no ciclo: Pendente -> Atrasado -> Concluído -> Pendente
     switch (statusAtual) {
         case 'Pendente':
             novoStatus = 'atrasado';
@@ -547,348 +215,245 @@ function alterarStatus(event, lancamentoId) {
             novoStatusClass = '🟢';
             break;
         case 'Concluído':
+        default:
             novoStatus = 'pendente';
             novoStatusButtonText = 'Pendente';
             novoStatusClass = '🟡';
             break;
-        default: // Caso o botão não tenha um status reconhecido, volta para Pendente
-            novoStatus = 'pendente';
-            novoStatusButtonText = 'Pendente';
-            novoStatusClass = '🟡';
     }
 
-    // Atualiza o botão visualmente
     button.textContent = novoStatusButtonText;
-    // Remove classes de status anteriores e adiciona a nova
     button.classList.remove('🟢', '🟡', '🔴');
     button.classList.add(novoStatusClass);
 
-    // Atualiza o status no array de lançamentos e salva no localStorage
     let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    const lancamentoIndex = lancamentos.findIndex(lancamento => lancamento.id === lancamentoId);
+    const lancamentoIndex = lancamentos.findIndex(l => l.id === lancamentoId);
 
     if (lancamentoIndex !== -1) {
         lancamentos[lancamentoIndex].status = novoStatus;
         localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-    } else {
-        console.error(`Erro: Lançamento com ID ${lancamentoId} não encontrado para atualizar status.`);
+        
+        // Recarrega os dados atuais para atualizar o dashboard
+        const inputCompetencia = document.getElementById('filtroCompetencia');
+        if (inputCompetencia && inputCompetencia.value) {
+            filtrarLancamentosPorCompetencia(inputCompetencia.value);
+        } else {
+            atualizarResumo(lancamentos);
+        }
     }
 }
 
-// Função para integrar a renderização dos botões de status na tabela principal
-// Esta função deve ser chamada dentro da sua função principal de renderização da tabela (ex: renderizarTabelaLancamentos)
-function renderizarTabelaLancamentos() {
-    const tabelaBody = document.getElementById('tabelaLancamentosBody'); // Assumindo que há um tbody com este ID
-    if (!tabelaBody) return;
+// ==========================================
+// 5. AÇÕES (EDITAR, SALVAR, EXCLUIR, DUPLICAR)
+// ==========================================
 
-    tabelaBody.innerHTML = ''; // Limpa o conteúdo atual da tabela
-
+function editarLancamento(id) {
     let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const lancamentoParaEditar = lancamentos.find(l => l.id === id);
 
-    // Ordena os lançamentos por data (mais recentes primeiro)
-    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
+    if (lancamentoParaEditar) {
+        document.getElementById('descricaoLancamento').value = lancamentoParaEditar.descricao;
+        document.getElementById('valorLancamento').value = lancamentoParaEditar.valor.toFixed(2).replace('.', ',');
+        document.getElementById('tipoLancamento').value = lancamentoParaEditar.tipo;
+        document.getElementById('dataLancamento').value = lancamentoParaEditar.data;
+        document.getElementById('categoriaLancamento').value = lancamentoParaEditar.categoria || '';
 
-    lancamentos.forEach(lancamento => {
-        const linha = tabelaBody.insertRow();
-        linha.dataset.lancamentoId = lancamento.id; // Adiciona um atributo data-* para referenciar o ID do lançamento
-
-        // Células para data, descrição, tipo, valor
-        const dataCell = linha.insertCell();
-        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
-
-        const descricaoCell = linha.insertCell();
-        descricaoCell.textContent = lancamento.descricao;
-
-        const tipoCell = linha.insertCell();
-        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
-
-        const valorCell = linha.insertCell();
-        const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        valorCell.textContent = valorFormatado;
-        // Adiciona cor ao valor se for despesa
-        if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
-            valorCell.style.color = 'red';
-        } else {
-            valorCell.style.color = 'green';
-        }
-
-        // Chama a função para renderizar o botão de status nesta linha
-        renderizarBotoesStatus(lancamento, linha);
-
-        // Célula para botões de ação (editar, excluir, duplicar)
-        const acoesCell = linha.insertCell();
-        acoesCell.innerHTML = `
-            <button onclick="editarLancamento(${lancamento.id})">✏️</button>
-            <button onclick="excluirLancamento(${lancamento.id})">🗑️</button>
-            <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
-        `;
-    });
+        const form = document.getElementById('formLancamento');
+        form.dataset.editingId = id;
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.textContent = 'Atualizar Lançamento';
+    } else {
+        alert('Lançamento não encontrado para edição.');
+    }
 }
 
-// Certifique-se de que esta função seja chamada quando a página carregar ou os dados forem atualizados
-document.addEventListener('DOMContentLoaded', renderizarTabelaLancamentos);
-// Script para a Ferramenta de Duplicação Mensal (Recorrência)
-
-// Função para duplicar um lançamento específico para o mês seguinte
-function duplicarLancamento(id) {
-    // Recupera todos os lançamentos do localStorage
+function salvarEdicaoLancamento(id) {
+    const form = document.getElementById('formLancamento');
+    
     let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-    // Encontra o lançamento que se deseja duplicar pelo seu ID
-    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
+    const indiceLancamento = lancamentos.findIndex(l => l.id === id);
 
-    if (lancamentoOriginal) {
-        // Converte a data original para um objeto Date
-        const dataOriginal = new Date(lancamentoOriginal.data);
-        // Calcula a data para o mês seguinte, mantendo o dia
-        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
-
-        // Cria um novo objeto de lançamento, copiando as propriedades do original
-        const novoLancamentoDuplicado = {
-            ...lancamentoOriginal, // Copia todas as propriedades (descrição, valor, tipo, etc.)
-            id: Date.now() + Math.random(), // Gera um novo ID único para evitar conflitos
-            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês no formato YYYY-MM-DD
-            status: 'pendente' // Define o status padrão como 'pendente' para o novo lançamento
+    if (indiceLancamento !== -1) {
+        lancamentos[indiceLancamento] = {
+            ...lancamentos[indiceLancamento],
+            descricao: document.getElementById('descricaoLancamento').value,
+            valor: parseFloat(document.getElementById('valorLancamento').value.replace(',', '.')),
+            tipo: document.getElementById('tipoLancamento').value,
+            data: document.getElementById('dataLancamento').value,
+            categoria: document.getElementById('categoriaLancamento').value
         };
 
-        // Adiciona o novo lançamento duplicado à lista de lançamentos
-        lancamentos.push(novoLancamentoDuplicado);
-        // Salva a lista atualizada de volta no localStorage
         localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
-        // Atualiza a exibição da tabela para mostrar o novo lançamento
-        renderizarTabelaLancamentos(); // Assumindo que esta função existe e atualiza a tabela
+
+        form.dataset.editingId = '';
+        form.reset();
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.textContent = 'Adicionar Lançamento';
+
+        const inputCompetencia = document.getElementById('filtroCompetencia');
+        if (inputCompetencia && inputCompetencia.value) {
+            filtrarLancamentosPorCompetencia(inputCompetencia.value);
+        } else {
+            renderizarTabelaFiltrada(lancamentos);
+        }
+    }
+}
+
+function excluirLancamento(id) {
+    if (!confirm('Tem certeza que deseja excluir este lançamento?')) return;
+
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const lancamentosAtualizados = lancamentos.filter(l => l.id !== id);
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentosAtualizados));
+    
+    const inputCompetencia = document.getElementById('filtroCompetencia');
+    if (inputCompetencia && inputCompetencia.value) {
+        filtrarLancamentosPorCompetencia(inputCompetencia.value);
+    } else {
+        renderizarTabelaFiltrada(lancamentosAtualizados);
+    }
+}
+
+function duplicarLancamento(id) {
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const lancamentoOriginal = lancamentos.find(l => l.id === id);
+
+    if (lancamentoOriginal) {
+        const dataOriginal = new Date(lancamentoOriginal.data + 'T00:00:00'); // Evita problemas de fuso horário local
+        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
+
+        const novoLancamentoDuplicado = {
+            ...lancamentoOriginal,
+            id: Date.now() + Math.random(),
+            data: proximoMes.toISOString().split('T')[0],
+            status: 'pendente'
+        };
+
+        lancamentos.push(novoLancamentoDuplicado);
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+        
+        const inputCompetencia = document.getElementById('filtroCompetencia');
+        if (inputCompetencia && inputCompetencia.value) {
+            filtrarLancamentosPorCompetencia(inputCompetencia.value);
+        } else {
+            renderizarTabelaFiltrada(lancamentos);
+        }
         alert('Lançamento duplicado para o próximo mês com status Pendente!');
     } else {
-        // Exibe um alerta se o lançamento original não for encontrado
         alert('Lançamento não encontrado para duplicação.');
     }
 }
 
-// Esta função pode ser chamada pelo botão "➕" na sua tabela de lançamentos.
-// Exemplo de como o botão estaria no HTML da célula de ações:
-// <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
+// ==========================================
+// 6. FILTRO DE COMPETÊNCIA MENSAL
+// ==========================================
 
-// Certifique-se de que a função renderizarTabelaLancamentos esteja definida e acessível,
-// pois ela é responsável por atualizar a interface após a duplicação.
-// Exemplo:
-// document.addEventListener('DOMContentLoaded', renderizarTabelaLancamentos);
-// Script para o Filtro de Competência Mensal
-
-// Elemento do input de data (tipo mês)
-const inputCompetencia = document.getElementById('filtroCompetencia'); // Assumindo um input com id="filtroCompetencia"
-
-// Elemento que contém a tabela de lançamentos (ex: tbody)
-const tabelaLancamentosBody = document.getElementById('tabelaLancamentosBody'); // Assumindo um tbody com id="tabelaLancamentosBody"
-
-// Listener para o evento 'change' no input de competência
-inputCompetencia.addEventListener('change', function() {
-    // Obtém a data selecionada no formato YYYY-MM
-    const competenciaSelecionada = this.value;
-
-    // Filtra e re-renderiza a tabela
-    filtrarLancamentosPorCompetencia(competenciaSelecionada);
-});
-
-// Função para filtrar os lançamentos pela competência (mês/ano)
-function filtrarLancamentosPorCompetencia(competencia) {
-    // Busca todos os lançamentos do localStorage
-    let todosLancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
-
-    let lancamentosFiltrados = [];
-
-    if (!competencia) {
-        // Se nenhuma competência estiver selecionada, mostra todos os lançamentos
-        lancamentosFiltrados = todosLancamentos;
-    } else {
-        // Filtra os lançamentos que correspondem à competência selecionada
-        lancamentosFiltrados = todosLancamentos.filter(lancamento => {
-            // Extrai o ano e mês da data do lançamento
-            const dataLancamento = new Date(lancamento.data);
-            const anoLancamento = dataLancamento.getFullYear();
-            const mesLancamento = (dataLancamento.getMonth() + 1).toString().padStart(2, '0'); // Mês é 0-indexado, adiciona padding
-
-            // Cria uma string no formato YYYY-MM para comparação
-            const competenciaLancamento = `${anoLancamento}-${mesLancamento}`;
-
-            // Compara com a competência selecionada
-            return competenciaLancamento === competencia;
-        });
-    }
-
-    // Re-renderiza a tabela com os lançamentos filtrados
-    renderizarTabelaFiltrada(lancamentosFiltrados);
-}
-
-// Função para renderizar a tabela com os lançamentos filtrados
-function renderizarTabelaFiltrada(lancamentosParaRenderizar) {
-    // Limpa o corpo da tabela atual
-    tabelaLancamentosBody.innerHTML = '';
-
-    // Ordena os lançamentos filtrados por data (mais recentes primeiro)
-    lancamentosParaRenderizar.sort((a, b) => new Date(b.data) - new Date(a.data));
-
-    // Itera sobre os lançamentos filtrados e os adiciona à tabela
-    lancamentosParaRenderizar.forEach(lancamento => {
-        const linha = tabelaLancamentosBody.insertRow();
-        linha.dataset.lancamentoId = lancamento.id; // Adiciona ID para referência
-
-        const dataCell = linha.insertCell();
-        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
-
-        const descricaoCell = linha.insertCell();
-        descricaoCell.textContent = lancamento.descricao;
-
-        const categoriaCell = linha.insertCell();
-        categoriaCell.textContent = lancamento.categoria || '-'; // Exibe '-' se não houver categoria
-
-        const tipoCell = linha.insertCell();
-        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
-
-        const valorCell = linha.insertCell();
-        const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        valorCell.textContent = valorFormatado;
-        if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
-            valorCell.style.color = 'red';
-        } else {
-            valorCell.style.color = 'green';
-        }
-
-        // Renderiza o botão de status (assumindo que a função existe e está acessível)
-        renderizarBotoesStatus(lancamento, linha); // Chama a função do ControleStatus.js
-
-        // Célula para botões de ação
-        const acoesCell = linha.insertCell();
-        acoesCell.innerHTML = `
-            <button onclick="editarLancamento(${lancamento.id})">✏️</button>
-            <button onclick="excluirLancamento(${lancamento.id})">🗑️</button>
-            <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
-        `;
-    });
-}
-
-// Função auxiliar para inicializar o filtro com o mês/ano atual
 function inicializarFiltroCompetencia() {
-    const hoje = new Date();
-    const anoAtual = hoje.getFullYear();
-    const mesAtual = (hoje.getMonth() + 1).toString().padStart(2, '0'); // Mês é 0-indexado
-    const competenciaAtual = `${anoAtual}-${mesAtual}`;
+    const inputCompetencia = document.getElementById('filtroCompetencia');
+    if (inputCompetencia) {
+        const hoje = new Date();
+        const competenciaAtual = `${hoje.getFullYear()}-${(hoje.getMonth() + 1).toString().padStart(2, '0')}`;
+        inputCompetencia.value = competenciaAtual;
 
-    // Define o valor do input de competência para o mês atual
-    const input = document.getElementById('filtroCompetencia');
-    if (input) {
-        input.value = competenciaAtual;
-        // Chama o filtro com a competência atual para carregar os dados corretos inicialmente
+        inputCompetencia.addEventListener('change', function() {
+            filtrarLancamentosPorCompetencia(this.value);
+        });
+
         filtrarLancamentosPorCompetencia(competenciaAtual);
     } else {
-        // Se o input não existir, apenas renderiza todos os lançamentos (sem filtro inicial)
         renderizarTabelaFiltrada(JSON.parse(localStorage.getItem('lancamentos')) || []);
     }
 }
 
-// Inicializa o filtro quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', inicializarFiltroCompetencia);
-
-// Nota: As funções `renderizarBotoesStatus`, `editarLancamento`, `excluirLancamento`,
-// `duplicarLancamento`, e `renderizarTabelaLancamentos` (ou uma versão similar que
-// renderize a tabela completa) devem estar definidas e acessíveis para que este script funcione corretamente.
-// Elas são geralmente encontradas em outros arquivos como ControleStatus.js, GerenciadorEstado.js, etc.
-// Script para o Sistema de Abas Lateral
-
-// Seleciona todos os elementos que representam as abas
-const abas = document.querySelectorAll('.aba');
-// Seleciona todos os conteúdos das abas
-const conteudosAba = document.querySelectorAll('.conteudo-aba');
-
-// Adiciona um listener de evento a cada aba
-abas.forEach(aba => {
-    aba.addEventListener('click', () => {
-        // Remove a classe 'ativa' de todas as abas
-        abas.forEach(a => a.classList.remove('ativa'));
-        // Adiciona a classe 'ativa' à aba clicada
-        aba.classList.add('ativa');
-
-        // Esconde todos os conteúdos de aba
-        conteudosAba.forEach(c => c.classList.remove('ativa'));
-
-        // Mostra o conteúdo de aba correspondente à aba clicada
-        // Usa o atributo 'data-aba' para ligar a aba ao seu conteúdo
-        const idConteudo = aba.getAttribute('data-aba');
-        document.getElementById(idConteudo).classList.add('ativa');
-    });
-});
-
-// Opcional: Ativar a primeira aba por padrão ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
-    if (abas.length > 0) {
-        // Simula um clique na primeira aba para ativar seu conteúdo
-        abas[0].click();
+function filtrarLancamentosPorCompetencia(competencia) {
+    let todosLancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    if (!competencia) {
+        renderizarTabelaFiltrada(todosLancamentos);
+        return;
     }
-});
 
-// Exemplo de como o HTML das abas e conteúdos pode ser estruturado:
-/*
-<nav class="menu-lateral">
-    <div class="aba ativa" data-aba="aba-financas">Finanças 💰</div>
-    <div class="aba" data-aba="aba-sincronizacao">Sincronização/Backup 🔄</div>
-    <div class="aba" data-aba="aba-ia">Inteligência Artificial ✨</div>
-</nav>
+    const lancamentosFiltrados = todosLancamentos.filter(lancamento => {
+        const dataLancamento = new Date(lancamento.data + 'T00:00:00');
+        const anoLancamento = dataLancamento.getFullYear();
+        const mesLancamento = (dataLancamento.getMonth() + 1).toString().padStart(2, '0');
+        return `${anoLancamento}-${mesLancamento}` === competencia;
+    });
 
-<div class="conteudo-abas">
-    <div id="aba-financas" class="conteudo-aba ativa">
-        <!-- Conteúdo da aba Finanças aqui -->
-        <h1>Painel Financeiro</h1>
-        <p>Todos os seus lançamentos e resumos.</p>
-    </div>
-    <div id="aba-sincronizacao" class="conteudo-aba">
-        <!-- Conteúdo da aba Sincronização/Backup aqui -->
-        <h1>Sincronização e Backup</h1>
-        <p>Opções para exportar e importar dados.</p>
-    </div>
-    <div id="aba-ia" class="conteudo-aba">
-        <!-- Conteúdo da aba Inteligência Artificial aqui -->
-        <h1>Inteligência Artificial</h1>
-        <p>Análises e sugestões inteligentes.</p>
-    </div>
-</div>
-*/
-// Script para a Exportação de Relatórios (PDF e JSON)
+    renderizarTabelaFiltrada(lancamentosFiltrados);
+}
 
-// Assumindo que você tenha uma biblioteca como jsPDF para gerar PDFs
-// Se não tiver, você precisará instalá-la: npm install jspdf
-// E importá-la: import { jsPDF } from "jspdf";
+// ==========================================
+// 7. SISTEMA DE ABAS LATERAIS
+// ==========================================
 
-// Função para gerar e exportar o relatório em PDF
+function inicializarSistemaAbas() {
+    const abas = document.querySelectorAll('.aba');
+    const conteudosAba = document.querySelectorAll('.conteudo-aba');
+
+    abas.forEach(aba => {
+        aba.addEventListener('click', () => {
+            abas.forEach(a => a.classList.remove('ativa'));
+            aba.classList.add('ativa');
+
+            conteudosAba.forEach(c => c.classList.remove('ativa'));
+            const idConteudo = aba.getAttribute('data-aba');
+            const alvo = document.getElementById(idConteudo);
+            if (alvo) alvo.classList.add('ativa');
+        });
+    });
+
+    if (abas.length > 0) abas[0].click();
+}
+
+// ==========================================
+// 8. EXPORTAÇÃO DE RELATÓRIOS (PDF)
+// ==========================================
+
 async function exportarParaPDF() {
-    // 1. Obter os dados filtrados do mês atual (ou do período selecionado)
-    const competenciaSelecionada = document.getElementById('filtroCompetencia')?.value; // Pega a competência do filtro
+    const competenciaSelecionada = document.getElementById('filtroCompetencia')?.value;
     let lancamentosParaExportar = JSON.parse(localStorage.getItem('lancamentos')) || [];
 
     if (competenciaSelecionada) {
-        // Filtra os lançamentos para a competência selecionada, se houver
         lancamentosParaExportar = lancamentosParaExportar.filter(lancamento => {
-            const dataLancamento = new Date(lancamento.data);
+            const dataLancamento = new Date(lancamento.data + 'T00:00:00');
             const anoLancamento = dataLancamento.getFullYear();
             const mesLancamento = (dataLancamento.getMonth() + 1).toString().padStart(2, '0');
-            const competenciaLancamento = `${anoLancamento}-${mesLancamento}`;
-            return competenciaLancamento === competenciaSelecionada;
+            return `${anoLancamento}-${mesLancamento}` === competenciaSelecionada;
         });
     } else {
-        // Se não houver competência selecionada, usa todos os lançamentos ou avisa o usuário
-        // Para este exemplo, usaremos todos os lançamentos se nenhum filtro estiver ativo.
-        // Uma melhoria seria forçar a seleção de competência para o PDF.
-        console.warn("Nenhuma competência selecionada. Exportando todos os lançamentos disponíveis.");
+        console.warn("Nenhuma competência selecionada. Exportando todos os registros.");
     }
 
-    // 2. Gerar o conteúdo do PDF
-    // Usando jsPDF (exemplo básico)
-    const { jsPDF } = window.jspdf; // Assumindo que jspdf está carregado globalmente
-    const doc = new jsPDF();
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) {
+        alert("Erro: Biblioteca jsPDF não encontrada. Certifique-se de adicioná-la no seu HTML.");
+        return;
+    }
 
-    // Adiciona um título ao documento
+    const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text("Relatório Financeiro", 10, 10);
     doc.setFontSize(12);
-    if (competenciaSelecionada) {
-        doc.text(`Competência: ${competenciaSelecionada}`, 10, 20);
-    } else {
-        doc.text("Período: Todos os Registros", 10, 20);
-    
+    doc.text(competenciaSelecionada ? `Competência: ${competenciaSelecionada}` : "Período: Todos os Registros", 10, 20);
+
+    let yPosition = 35;
+    doc.setFontSize(10);
+    doc.text("Data | Descrição | Categoria | Tipo | Valor", 10, yPosition);
+    doc.line(10, yPosition + 2, 200, yPosition + 2);
+    yPosition += 10;
+
+    lancamentosParaExportar.forEach(l => {
+        if (yPosition > 280) { // Cria nova página se estourar o limite vertical
+            doc.addPage();
+            yPosition = 20;
+        }
+        const dataFormatada = new Date(l.data + 'T00:00:00').toLocaleDateString('pt-BR');
+        const valorFormatado = formatarMoeda(l.valor);
+        const tipoLimpo = l.tipo.replace('_', ' ');
+        
+        doc.text(`${dataFormatada} | ${l.descricao} | ${l.categoria || '-'} | ${tipoLimpo} | ${valorFormatado}`, 10, yPosition);
+        yPosition += 8;
+    });
+
+    doc.save(`Relatorio_Financeiro_${competenciaSelecionada || 'Geral'}.pdf`);
+}
