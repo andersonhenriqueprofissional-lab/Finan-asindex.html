@@ -1,357 +1,894 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organizador Financeiro Inteligente</title>
-    <!-- Tailwind CSS para um design moderno e limpo -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para Relatórios e Gráficos -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-gray-100 text-gray-800 font-sans">
+// Script para o Dashboard de Resumos
 
-    <!-- Navbar -->
-    <nav class="bg-blue-600 p-4 text-white shadow-md">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">✨ FinançasEvolução</h1>
-            <span class="text-sm bg-blue-700 px-3 py-1 rounded-full">IA Integrada</span>
-        </div>
-    </nav>
+// Elementos do DOM para exibir os totais
+const totalRecebidoCard = document.getElementById('totalRecebido');
+const totalContasCard = document.getElementById('totalContas');
+const totalMetasCard = document.getElementById('totalMetas');
+const saldoRestanteCard = document.getElementById('saldoRestante');
+const saldoRestanteValorSpan = document.getElementById('saldoRestanteValor'); // Para mudar a cor
 
-    <!-- Main Content -->
-    <main class="container mx-auto p-4 md:p-6 space-y-6">
+// Função para buscar e exibir os dados do resumo
+async function atualizarResumo() {
+    // Simula a busca de dados dinâmicos (substitua por sua lógica de busca real)
+    const dadosResumo = await buscarDadosFinanceiros();
 
-        <!-- Dashboard de Resumo -->
-        <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-xl shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 font-semibold">Receitas (Pagas/Recebidas)</p>
-                <p class="text-2xl font-bold text-green-600" id="total-receitas">R$ 0,00</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow border-l-4 border-red-500">
-                <p class="text-sm text-gray-500 font-semibold">Despesas (Pagas)</p>
-                <p class="text-2xl font-bold text-red-600" id="total-despesas">R$ 0,00</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-sm text-gray-500 font-semibold">Investimentos / Metas</p>
-                <p class="text-2xl font-bold text-blue-600" id="total-investimentos">R$ 0,00</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 font-semibold">Saldo Atual Disponível</p>
-                <p class="text-2xl font-bold text-purple-600" id="saldo-geral">R$ 0,00</p>
-            </div>
-        </section>
+    // Atualiza os cards com os dados recebidos
+    totalRecebidoCard.innerText = formatarMoeda(dadosResumo.totalRecebido);
+    totalContasCard.innerText = formatarMoeda(dadosResumo.totalContas);
+    totalMetasCard.innerText = formatarMoeda(dadosResumo.totalMetas);
 
-        <!-- Alerta de Pendências -->
-        <div id="alerta-pendente" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded-lg shadow-sm text-sm font-medium">
-            ⚠️ Atenção: Você ainda possui contas ou valores pendentes para este mês!
-        </div>
+    const saldoLiquido = dadosResumo.totalRecebido - dadosResumo.totalContas - dadosResumo.totalMetas;
+    saldoRestanteValorSpan.innerText = formatarMoeda(saldoLiquido);
 
-        <!-- Formulário de Entrada e IA -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <!-- Formulário de Cadastro -->
-            <div class="bg-white p-6 rounded-xl shadow lg:col-span-1">
-                <h2 class="text-lg font-bold mb-4 text-gray-700">Nova Transação / Meta</h2>
-                <form id="finance-form" class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600">Descrição</label>
-                        <input type="text" id="desc" class="w-full p-2 border rounded" required placeholder="Ex: Salário, Aluguel, Parcela Carro">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600">Valor (R$)</label>
-                            <input type="number" step="0.01" id="valor" class="w-full p-2 border rounded" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600">Tipo</label>
-                            <select id="tipo" class="w-full p-2 border rounded">
-                                <option value="receita_fixa">Receita Fixa</option>
-                                <option value="receita_variavel">Receita Variável</option>
-                                <option value="despesa_fixa">Despesa Fixa</option>
-                                <option value="despesa_variavel">Despesa Variável</option>
-                                <option value="parcelado">Parcelado (Despesa)</option>
-                                <option value="investimento">Investimento / Meta</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id="div-parcelas" class="hidden">
-                        <label class="block text-xs font-semibold text-gray-600">Número de Parcelas</label>
-                        <input type="number" id="parcelas" min="2" value="2" class="w-full p-2 border rounded">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 flex items-center pt-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600">Data</label>
-                            <input type="date" id="data" class="w-full p-2 border rounded" required>
-                        </div>
-                        <div class="flex items-center h-full pt-4 pl-2">
-                            <input type="checkbox" id="pago" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
-                            <label for="pago" class="ml-2 text-sm font-semibold text-gray-700">Já pago/recebido</label>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600">Anexar Comprovante</label>
-                        <input type="file" id="arquivo" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    </div>
-                    <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded font-bold hover:bg-blue-700 transition">Salvar Lançamento</button>
-                </form>
-            </div>
+    // Altera a cor do saldo restante com base no valor
+    if (saldoLiquido >= 0) {
+        saldoRestanteValorSpan.style.color = 'green'; // Cor para positivo
+    } else {
+        saldoRestanteValorSpan.style.color = 'red'; // Cor para negativo
+    }
+}
 
-            <!-- Assistente de IA -->
-            <div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white p-6 rounded-xl shadow lg:col-span-2 flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
-                        🧠 Consultor Financeiro IA (Gemini)
-                    </h2>
-                    <p class="text-xs text-blue-200 mb-4">Clique no botão abaixo para que a IA analise seus dados atuais, incluindo o que está pago e o que está pendente.</p>
-                    <div id="ia-output" class="text-sm bg-black/30 p-4 rounded-lg min-h-[150px] max-h-[220px] overflow-y-auto border border-blue-500/30 whitespace-pre-wrap">
-                        Aguardando comandos... Clique em "Analisar minhas Finanças" para começar.
-                    </div>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button id="btn-analise-ia" class="flex-1 bg-cyan-500 text-gray-900 font-bold p-2 rounded hover:bg-cyan-400 transition">Analisar minhas Finanças</button>
-                    <button id="btn-limpar-chave" class="bg-red-600 text-white font-bold p-2 px-3 rounded hover:bg-red-700 transition text-xs" title="Trocar Chave de API">Trocar Chave</button>
-                </div>
-            </div>
-        </section>
+// Função auxiliar para formatar valores como moeda brasileira
+function formatarMoeda(valor) {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
-        <!-- Gráficos e Relatórios -->
-        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-4 rounded-xl shadow">
-                <h3 class="text-md font-bold mb-2 text-gray-700">Relatório Mensal Realizado (Pago)</h3>
-                <canvas id="chartMensal"></canvas>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow">
-                <h3 class="text-md font-bold mb-2 text-gray-700">Relatório Anual Projetado</h3>
-                <canvas id="chartAnual"></canvas>
-            </div>
-        </section>
-
-        <!-- Tabela de Dados (Inclusão, Edição, Exclusão, Status) -->
-        <section class="bg-white p-6 rounded-xl shadow overflow-hidden">
-            <h2 class="text-lg font-bold mb-4 text-gray-700">Extrato e Gerenciamento</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
-                            <th class="p-3">Descrição</th>
-                            <th class="p-3">Tipo</th>
-                            <th class="p-3">Valor</th>
-                            <th class="p-3">Data</th>
-                            <th class="p-3">Status</th>
-                            <th class="p-3">Anexo</th>
-                            <th class="p-3">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body" class="divide-y divide-gray-200 text-sm">
-                        <!-- Gerado dinamicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <!-- JavaScript Principal do Sistema -->
-    <script>
-        // --- CONFIGURAÇÕES DE INTERFACE E ESTADO ---
-        let transacoes = JSON.parse(localStorage.getItem('financas_dados')) || [];
-        
-        const form = document.getElementById('finance-form');
-        const tipoSelect = document.getElementById('tipo');
-        const divParcelas = document.getElementById('div-parcelas');
-
-        tipoSelect.addEventListener('change', () => {
-            if(tipoSelect.value === 'parcelado') {
-                divParcelas.classList.remove('hidden');
-            } else {
-                divParcelas.classList.add('hidden');
-            }
-        });
-
-        // --- SALVAR E MANIPULAR DADOS (CRUD) ---
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('arquivo');
-            let nomeArquivo = fileInput.files[0] ? fileInput.files[0].name : "Sem anexo";
-
-            const novaTransacao = {
-                id: Date.now(),
-                descricao: document.getElementById('desc').value,
-                valor: parseFloat(document.getElementById('valor').value),
-                tipo: tipoSelect.value,
-                parcelas: tipoSelect.value === 'parcelado' ? parseInt(document.getElementById('parcelas').value) : 1,
-                data: document.getElementById('data').value,
-                pago: document.getElementById('pago').checked,
-                anexo: nomeArquivo
-            };
-
-            transacoes.push(novaTransacao);
-            atualizarSistema();
-            form.reset();
-            divParcelas.classList.add('hidden');
-        });
-
-        function deletarTransacao(id) {
-            transacoes = transacoes.filter(t => t.id !== id);
-            atualizarSistema();
-        }
-
-        function alternarStatusPago(id) {
-            transacoes = transacoes.map(t => {
-                if(t.id === id) t.pago = !t.pago;
-                return t;
+// Função simulada para buscar dados financeiros (substitua pela sua implementação real)
+async function buscarDadosFinanceiros() {
+    // Em um aplicativo real, você buscaria estes dados do localStorage, banco de dados, API, etc.
+    // Aqui, retornamos valores simulados para demonstração.
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve({
+                totalRecebido: 5000.50,
+                totalContas: 2500.75,
+                totalMetas: 1000.00
             });
-            atualizarSistema();
+        }, 500); // Simula um pequeno atraso de rede
+    });
+}
+
+// Chama a função para atualizar o resumo ao carregar a página
+document.addEventListener('DOMContentLoaded', atualizarResumo);
+// Script para o Sistema de Lançamentos Flexível
+
+// Elementos do DOM para o formulário de lançamento
+const formLancamento = document.getElementById('formLancamento');
+const inputDescricao = document.getElementById('descricaoLancamento');
+const inputValor = document.getElementById('valorLancamento');
+const selectTipo = document.getElementById('tipoLancamento');
+const inputData = document.getElementById('dataLancamento');
+const inputCategoria = document.getElementById('categoriaLancamento'); // Adicionado campo de categoria
+
+// Adiciona um listener para o evento de submit do formulário
+formLancamento.addEventListener('submit', function(event) {
+    event.preventDefault(); // Impede o comportamento padrão de submissão do formulário
+
+    // Cria um objeto com os dados do lançamento
+    const novoLancamento = {
+        id: Date.now(), // Gera um ID único baseado no timestamp
+        descricao: inputDescricao.value,
+        valor: parseFloat(inputValor.value.replace(',', '.')), // Converte para número, tratando vírgula como decimal
+        tipo: selectTipo.value, // 'receita_fixa', 'receita_extra', 'pagamento_fixo', 'pagamento_mes', 'pagamento_avulso', 'meta', 'investimento'
+        data: inputData.value,
+        categoria: inputCategoria.value, // Captura o valor da categoria
+        status: 'pendente' // Status inicial padrão
+    };
+
+    // Adiciona o novo lançamento à lista (substitua por sua lógica de persistência)
+    adicionarLancamento(novoLancamento);
+
+    // Limpa o formulário após o lançamento
+    formLancamento.reset();
+    // Opcionalmente, pode redefinir o foco para o primeiro campo
+    inputDescricao.focus();
+});
+
+// Função para adicionar um lançamento à lista (exemplo com localStorage)
+function adicionarLancamento(lancamento) {
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Adiciona o novo lançamento ao array
+    lancamentos.push(lancamento);
+    // Salva a lista atualizada de volta no localStorage
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+    // Atualiza a exibição da tabela de lançamentos (função a ser implementada)
+    renderizarTabelaLancamentos();
+}
+
+// Função para inicializar a renderização da tabela ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    renderizarTabelaLancamentos();
+});
+
+// Função simulada para renderizar a tabela de lançamentos (precisa ser implementada com base nos dados reais)
+function renderizarTabelaLancamentos() {
+    const tabelaBody = document.getElementById('tabelaLancamentosBody'); // Assumindo que há um tbody com este ID
+    if (!tabelaBody) return; // Sai se o elemento não for encontrado
+
+    tabelaBody.innerHTML = ''; // Limpa o conteúdo atual da tabela
+
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+
+    // Ordena os lançamentos por data (mais recentes primeiro)
+    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    lancamentos.forEach(lancamento => {
+        const linha = tabelaBody.insertRow();
+
+        const dataCell = linha.insertCell();
+        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
+
+        const descricaoCell = linha.insertCell();
+        descricaoCell.textContent = lancamento.descricao;
+
+        const categoriaCell = linha.insertCell();
+        categoriaCell.textContent = lancamento.categoria || '-'; // Exibe '-' se não houver categoria
+
+        const tipoCell = linha.insertCell();
+        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
+
+        const valorCell = linha.insertCell();
+        const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        valorCell.textContent = valorFormatado;
+        // Adiciona cor ao valor se for despesa
+        if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
+            valorCell.style.color = 'red';
+        } else {
+            valorCell.style.color = 'green';
         }
 
-        // --- ATUALIZAÇÃO DA TELA E CÁLCULOS ---
-        function atualizarSistema() {
-            localStorage.setItem('financas_dados', JSON.stringify(transacoes));
-            
-            let receitas = 0; let despesas = 0; let investimentos = 0;
-            let possuiPendentes = false;
-            
-            const tableBody = document.getElementById('table-body');
-            tableBody.innerHTML = '';
+        const statusCell = linha.insertCell();
+        // Adiciona botões visuais para status
+        statusCell.innerHTML = getStatusButtonHTML(lancamento.status);
 
-            transacoes.forEach(t => {
-                if (t.pago) {
-                    if(t.tipo.includes('receita')) receitas += t.valor;
-                    else if(t.tipo.includes('despesa') || t.tipo === 'parcelado') despesas += t.valor;
-                    else if(t.tipo === 'investimento') investimentos += t.valor;
-                } else {
-                    possuiPendentes = true;
-                }
+        // Adiciona botões de ação (editar, excluir, duplicar)
+        const acoesCell = linha.insertCell();
+        acoesCell.innerHTML = `
+            <button onclick="editarLancamento(${lancamento.id})">✏️</button>
+            <button onclick="excluirLancamento(${lancamento.id})">🗑️</button>
+            <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
+        `;
+    });
+}
 
-                const textoStatus = t.pago ? '🟢 Pago' : '🟡 Pendente';
-                const classeStatus = t.pago ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+// Função para obter o HTML do botão de status
+function getStatusButtonHTML(status) {
+    switch(status) {
+        case 'concluido':
+            return '<button class="status-btn 🟢" onclick="alterarStatus(event)">Concluído</button>';
+        case 'pendente':
+            return '<button class="status-btn 🟡" onclick="alterarStatus(event)">Pendente</button>';
+        case 'atrasado':
+            return '<button class="status-btn 🔴" onclick="alterarStatus(event)">Atrasado</button>';
+        default:
+            return '<button class="status-btn 🟡" onclick="alterarStatus(event)">Pendente</button>';
+    }
+}
 
-                tableBody.innerHTML += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-3 font-medium">${t.descricao}</td>
-                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${getTipoClasse(t.tipo)}">${t.tipo.toUpperCase()}</span></td>
-                        <td class="p-3 font-semibold text-gray-900">R$ ${t.valor.toFixed(2)}</td>
-                        <td class="p-3">${t.data.split('-').reverse().join('/')}</td>
-                        <td class="p-3">
-                            <button onclick="alternarStatusPago(${t.id})" class="px-3 py-1 rounded-full text-xs font-bold transition duration-150 ${classeStatus}">
-                                ${textoStatus}
-                            </button>
-                        </td>
-                        <td class="p-3 text-gray-500 italic text-xs">${t.anexo}</td>
-                        <td class="p-3">
-                            <button onclick="deletarTransacao(${t.id})" class="text-red-600 hover:text-red-900 font-semibold">Excluir</button>
-                        </td>
-                    </tr>
-                `;
-            });
+// Função placeholder para alterar status (precisa ser implementada com base no evento)
+function alterarStatus(event) {
+    const button = event.target;
+    const currentRow = button.closest('tr');
+    const statusText = button.textContent;
 
-            const alertaBox = document.getElementById('alerta-pendente');
-            if(possuiPendentes) alertaBox.classList.remove('hidden');
-            else alertaBox.classList.add('hidden');
+    let newStatus = '';
+    let newStatusClass = '';
+    let newStatusButtonText = '';
 
-            document.getElementById('total-receitas').innerText = `R$ ${receitas.toFixed(2)}`;
-            document.getElementById('total-despesas').innerText = `R$ ${despesas.toFixed(2)}`;
-            document.getElementById('total-investimentos').innerText = `R$ ${investimentos.toFixed(2)}`;
-            document.getElementById('saldo-geral').innerText = `R$ ${(receitas - despesas - investimentos).toFixed(2)}`;
+    switch(statusText) {
+        case 'Concluído':
+            newStatus = 'pendente';
+            newStatusButtonText = 'Pendente';
+            newStatusClass = '🟡';
+            break;
+        case 'Pendente':
+            newStatus = 'atrasado';
+            newStatusButtonText = 'Atrasado';
+            newStatusClass = '🔴';
+            break;
+        case 'Atrasado':
+            newStatus = 'concluido';
+            newStatusButtonText = 'Concluído';
+            newStatusClass = '🟢';
+            break;
+        default:
+            newStatus = 'pendente';
+            newStatusButtonText = 'Pendente';
+            newStatusClass = '🟡';
+    }
 
-            renderizarGraficos(receitas, despesas, investimentos);
+    // Atualiza o botão visualmente
+    button.textContent = newStatusButtonText;
+    button.className = `status-btn ${newStatusClass}`; // Atualiza a classe para mudar o ícone/cor
+
+    // TODO: Atualizar o status no localStorage para o lançamento correspondente
+    // Você precisará obter o ID do lançamento a partir da linha da tabela (currentRow)
+    // e então atualizar o objeto no array 'lancamentos' antes de salvá-lo.
+    console.log(`Status alterado para: ${newStatus}`);
+}
+
+// Funções placeholder para editar, excluir e duplicar lançamentos (precisam ser implementadas)
+function editarLancamento(id) {
+    alert(`Editar lançamento com ID: ${id}`);
+    // Lógica para carregar os dados do lançamento no formulário para edição
+}
+
+function excluirLancamento(id) {
+    alert(`Excluir lançamento com ID: ${id}`);
+    // Lógica para remover o lançamento do localStorage e atualizar a tabela
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    lancamentos = lancamentos.filter(lancamento => lancamento.id !== id);
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+    renderizarTabelaLancamentos(); // Atualiza a tabela
+}
+
+function duplicarLancamento(id) {
+    alert(`Duplicar lançamento com ID: ${id}`);
+    // Lógica para clonar o lançamento para o mês seguinte com status padrão pendente
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
+
+    if (lancamentoOriginal) {
+        const dataOriginal = new Date(lancamentoOriginal.data);
+        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
+
+        const novoLancamentoDuplicado = {
+            ...lancamentoOriginal, // Copia todas as propriedades do original
+            id: Date.now() + Math.random(), // Novo ID para evitar conflitos
+            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês
+            status: 'pendente' // Define o status padrão como pendente
+        };
+
+        lancamentos.push(novoLancamentoDuplicado);
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+        renderizarTabelaLancamentos(); // Atualiza a tabela
+    }
+}
+// Script para o Gerenciador de Estado Interativo
+
+// Função para inicializar o gerenciador de estado (ex: carregar dados do localStorage)
+function inicializarGerenciadorEstado() {
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+
+    // Ordena os lançamentos por data (mais recentes primeiro)
+    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    // Salva a lista ordenada de volta no localStorage
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+
+    // Renderiza a tabela de lançamentos inicial
+    renderizarTabelaLancamentos(); // Certifica-se que esta função está acessível
+}
+
+// Função para adicionar um novo lançamento (deve ser chamada por outros scripts, como o de Lançamentos)
+function adicionarLancamento(lancamento) {
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Adiciona o novo lançamento ao array
+    lancamentos.push(lancamento);
+    // Salva a lista atualizada de volta no localStorage
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+    // Atualiza a exibição da tabela de lançamentos
+    renderizarTabelaLancamentos();
+}
+
+// Função para editar um lançamento existente
+function editarLancamento(id) {
+    // Busca os lançamentos do localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Encontra o índice do lançamento a ser editado
+    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === id);
+
+    if (indiceLancamento !== -1) {
+        const lancamentoParaEditar = lancamentos[indiceLancamento];
+
+        // Preenche o formulário de lançamento com os dados do lançamento selecionado
+        document.getElementById('descricaoLancamento').value = lancamentoParaEditar.descricao;
+        document.getElementById('valorLancamento').value = lancamentoParaEditar.valor.toFixed(2).replace('.', ','); // Formata para exibição
+        document.getElementById('tipoLancamento').value = lancamentoParaEditar.tipo;
+        document.getElementById('dataLancamento').value = lancamentoParaEditar.data;
+        document.getElementById('categoriaLancamento').value = lancamentoParaEditar.categoria || ''; // Preenche a categoria
+
+        // Opcional: Mudar o botão de submit para "Atualizar" e armazenar o ID
+        const form = document.getElementById('formLancamento');
+        form.dataset.editingId = id; // Armazena o ID do lançamento sendo editado
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.textContent = 'Atualizar Lançamento';
+
+        // Atualiza a exibição da tabela (para remover o lançamento temporariamente ou marcá-lo)
+        // renderizarTabelaLancamentos(); // Pode ser necessário remover o item da tabela enquanto edita
+    } else {
+        alert('Lançamento não encontrado para edição.');
+    }
+}
+
+// Função para salvar as alterações de um lançamento editado
+function salvarEdicaoLancamento() {
+    const form = document.getElementById('formLancamento');
+    const id = parseInt(form.dataset.editingId); // Recupera o ID do lançamento sendo editado
+
+    if (isNaN(id)) {
+        alert('Erro ao salvar: Nenhum lançamento selecionado para edição.');
+        return;
+    }
+
+    // Coleta os novos dados do formulário
+    const descricao = document.getElementById('descricaoLancamento').value;
+    const valor = parseFloat(document.getElementById('valorLancamento').value.replace(',', '.'));
+    const tipo = document.getElementById('tipoLancamento').value;
+    const data = document.getElementById('dataLancamento').value;
+    const categoria = document.getElementById('categoriaLancamento').value;
+
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Encontra o índice do lançamento a ser atualizado
+    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === id);
+
+    if (indiceLancamento !== -1) {
+        // Atualiza os dados do lançamento
+        lancamentos[indiceLancamento] = {
+            ...lancamentos[indiceLancamento], // Mantém outras propriedades (como status, ID)
+            descricao: descricao,
+            valor: valor,
+            tipo: tipo,
+            data: data,
+            categoria: categoria
+        };
+
+        // Salva a lista atualizada de volta no localStorage
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+
+        // Limpa o estado de edição e reseta o formulário
+        form.dataset.editingId = '';
+        form.reset();
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.textContent = 'Adicionar Lançamento';
+
+        // Re-renderiza a tabela para mostrar as alterações
+        renderizarTabelaLancamentos();
+    } else {
+        alert('Erro ao salvar: Lançamento não encontrado.');
+    }
+}
+
+
+// Função para excluir um lançamento
+function excluirLancamento(id) {
+    // Confirmação antes de excluir
+    if (!confirm('Tem certeza que deseja excluir este lançamento?')) {
+        return; // Cancela a exclusão se o usuário não confirmar
+    }
+
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Filtra o array, removendo o lançamento com o ID especificado
+    const lancamentosAtualizados = lancamentos.filter(lancamento => lancamento.id !== id);
+    // Salva a lista atualizada de volta no localStorage
+    localStorage.setItem('lancamentos', JSON.stringify(lancamentosAtualizados));
+    // Atualiza a exibição da tabela de lançamentos
+    renderizarTabelaLancamentos();
+}
+
+// Função para alterar o status de um lançamento (🟢, 🟡, 🔴)
+function alterarStatus(event) {
+    const button = event.target;
+    const currentRow = button.closest('tr');
+    const statusText = button.textContent;
+    const lancamentoId = parseInt(currentRow.dataset.lancamentoId); // Assumindo que você adicionou data-lancamento-id na linha da tabela
+
+    let novoStatus = '';
+    let novoStatusButtonText = '';
+    let novoStatusClass = '';
+
+    // Determina o novo status com base no status atual
+    switch(statusText) {
+        case 'Concluído':
+            novoStatus = 'pendente';
+            novoStatusButtonText = 'Pendente';
+            novoStatusClass = '🟡';
+            break;
+        case 'Pendente':
+            novoStatus = 'atrasado';
+            novoStatusButtonText = 'Atrasado';
+            novoStatusClass = '🔴';
+            break;
+        case 'Atrasado':
+            novoStatus = 'concluido';
+            novoStatusButtonText = 'Concluído';
+            novoStatusClass = '🟢';
+            break;
+        default: // Caso o status não seja reconhecido, volta para pendente
+            novoStatus = 'pendente';
+            novoStatusButtonText = 'Pendente';
+            novoStatusClass = '🟡';
+    }
+
+    // Atualiza o botão visualmente
+    button.textContent = novoStatusButtonText;
+    button.className = `status-btn ${novoStatusClass}`; // Atualiza a classe para mudar o ícone/cor
+
+    // Atualiza o status no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const indiceLancamento = lancamentos.findIndex(lancamento => lancamento.id === lancamentoId);
+
+    if (indiceLancamento !== -1) {
+        lancamentos[indiceLancamento].status = novoStatus;
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+    } else {
+        alert('Erro ao atualizar status: Lançamento não encontrado.');
+    }
+}
+
+// Função para duplicar um lançamento para o mês seguinte
+function duplicarLancamento(id) {
+    // Busca os lançamentos existentes no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Encontra o lançamento original a ser duplicado
+    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
+
+    if (lancamentoOriginal) {
+        const dataOriginal = new Date(lancamentoOriginal.data);
+        // Calcula a data para o próximo mês
+        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
+
+        // Cria um novo objeto de lançamento com base no original
+        const novoLancamentoDuplicado = {
+            ...lancamentoOriginal, // Copia todas as propriedades do original
+            id: Date.now() + Math.random(), // Gera um novo ID único
+            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês no formato YYYY-MM-DD
+            status: 'pendente' // Define o status padrão como pendente
+        };
+
+        // Adiciona o novo lançamento à lista
+        lancamentos.push(novoLancamentoDuplicado);
+        // Salva a lista atualizada no localStorage
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+        // Atualiza a exibição da tabela
+        renderizarTabelaLancamentos();
+        alert('Lançamento duplicado para o próximo mês!');
+    } else {
+        alert('Lançamento não encontrado para duplicação.');
+    }
+}
+
+// Inicializa o gerenciador de estado ao carregar a página
+document.addEventListener('DOMContentLoaded', inicializarGerenciadorEstado);
+
+// Ouve o evento de 'submit' do formulário para adicionar ou atualizar lançamentos
+document.getElementById('formLancamento').addEventListener('submit', function(event) {
+    event.preventDefault(); // Impede o comportamento padrão do formulário
+
+    const editingId = parseInt(this.dataset.editingId); // Verifica se estamos em modo de edição
+
+    if (!isNaN(editingId)) {
+        // Se estamos editando, chama a função para salvar as alterações
+        salvarEdicaoLancamento();
+    } else {
+        // Se não estamos editando, adiciona um novo lançamento
+        const inputDescricao = document.getElementById('descricaoLancamento');
+        const inputValor = document.getElementById('valorLancamento');
+        const selectTipo = document.getElementById('tipoLancamento');
+        const inputData = document.getElementById('dataLancamento');
+        const inputCategoria = document.getElementById('categoriaLancamento');
+
+        const novoLancamento = {
+            id: Date.now(), // Gera um ID único
+            descricao: inputDescricao.value,
+            valor: parseFloat(inputValor.value.replace(',', '.')), // Converte para número
+            tipo: selectTipo.value,
+            data: inputData.value,
+            categoria: inputCategoria.value,
+            status: 'pendente' // Status inicial
+        };
+
+        adicionarLancamento(novoLancamento); // Chama a função de adicionar
+        this.reset(); // Limpa o formulário
+        inputDescricao.focus(); // Define o foco no campo de descrição
+    }
+});
+// Script para o Controle Dinâmico de Status (Clique Rápido)
+
+// Função para renderizar os botões de status na tabela
+function renderizarBotoesStatus(lancamento, linha) {
+    const statusCell = linha.insertCell();
+    const statusButton = document.createElement('button');
+    statusButton.className = `status-btn`; // Classe base para estilização
+
+    // Define o texto e a classe com base no status atual
+    switch (lancamento.status) {
+        case 'concluido':
+            statusButton.textContent = 'Concluído';
+            statusButton.classList.add('🟢');
+            break;
+        case 'pendente':
+            statusButton.textContent = 'Pendente';
+            statusButton.classList.add('🟡');
+            break;
+        case 'atrasado':
+            statusButton.textContent = 'Atrasado';
+            statusButton.classList.add('🔴');
+            break;
+        default: // Status padrão se não especificado
+            statusButton.textContent = 'Pendente';
+            statusButton.classList.add('🟡');
+            lancamento.status = 'pendente'; // Garante que o status seja consistente no array
+    }
+
+    // Adiciona o listener de evento de clique ao botão
+    statusButton.onclick = (event) => {
+        event.stopPropagation(); // Impede que o clique no botão dispare outros eventos da linha
+        alterarStatus(event, lancamento.id); // Chama a função para alterar o status, passando o ID do lançamento
+    };
+
+    statusCell.appendChild(statusButton);
+}
+
+// Função para alterar o status de um lançamento
+function alterarStatus(event, lancamentoId) {
+    const button = event.target;
+    const statusAtual = button.textContent;
+
+    let novoStatus = '';
+    let novoStatusButtonText = '';
+    let novoStatusClass = '';
+
+    // Determina o próximo status no ciclo: Pendente -> Atrasado -> Concluído -> Pendente
+    switch (statusAtual) {
+        case 'Pendente':
+            novoStatus = 'atrasado';
+            novoStatusButtonText = 'Atrasado';
+            novoStatusClass = '🔴';
+            break;
+        case 'Atrasado':
+            novoStatus = 'concluido';
+            novoStatusButtonText = 'Concluído';
+            novoStatusClass = '🟢';
+            break;
+        case 'Concluído':
+            novoStatus = 'pendente';
+            novoStatusButtonText = 'Pendente';
+            novoStatusClass = '🟡';
+            break;
+        default: // Caso o botão não tenha um status reconhecido, volta para Pendente
+            novoStatus = 'pendente';
+            novoStatusButtonText = 'Pendente';
+            novoStatusClass = '🟡';
+    }
+
+    // Atualiza o botão visualmente
+    button.textContent = novoStatusButtonText;
+    // Remove classes de status anteriores e adiciona a nova
+    button.classList.remove('🟢', '🟡', '🔴');
+    button.classList.add(novoStatusClass);
+
+    // Atualiza o status no array de lançamentos e salva no localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    const lancamentoIndex = lancamentos.findIndex(lancamento => lancamento.id === lancamentoId);
+
+    if (lancamentoIndex !== -1) {
+        lancamentos[lancamentoIndex].status = novoStatus;
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+    } else {
+        console.error(`Erro: Lançamento com ID ${lancamentoId} não encontrado para atualizar status.`);
+    }
+}
+
+// Função para integrar a renderização dos botões de status na tabela principal
+// Esta função deve ser chamada dentro da sua função principal de renderização da tabela (ex: renderizarTabelaLancamentos)
+function renderizarTabelaLancamentos() {
+    const tabelaBody = document.getElementById('tabelaLancamentosBody'); // Assumindo que há um tbody com este ID
+    if (!tabelaBody) return;
+
+    tabelaBody.innerHTML = ''; // Limpa o conteúdo atual da tabela
+
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+
+    // Ordena os lançamentos por data (mais recentes primeiro)
+    lancamentos.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    lancamentos.forEach(lancamento => {
+        const linha = tabelaBody.insertRow();
+        linha.dataset.lancamentoId = lancamento.id; // Adiciona um atributo data-* para referenciar o ID do lançamento
+
+        // Células para data, descrição, tipo, valor
+        const dataCell = linha.insertCell();
+        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
+
+        const descricaoCell = linha.insertCell();
+        descricaoCell.textContent = lancamento.descricao;
+
+        const tipoCell = linha.insertCell();
+        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
+
+        const valorCell = linha.insertCell();
+        const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        valorCell.textContent = valorFormatado;
+        // Adiciona cor ao valor se for despesa
+        if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
+            valorCell.style.color = 'red';
+        } else {
+            valorCell.style.color = 'green';
         }
 
-        function getTipoClasse(tipo) {
-            if(tipo.includes('receita')) return 'bg-green-100 text-green-800';
-            if(tipo.includes('despesa') || tipo === 'parcelado') return 'bg-red-100 text-red-800';
-            return 'bg-blue-100 text-blue-800';
-        }
+        // Chama a função para renderizar o botão de status nesta linha
+        renderizarBotoesStatus(lancamento, linha);
 
-        // --- GRÁFICOS ---
-        let chartM, chartA;
-        function renderizarGraficos(r, d, i) {
-            const ctxM = document.getElementById('chartMensal').getContext('2d');
-            const ctxA = document.getElementById('chartAnual').getContext('2d');
+        // Célula para botões de ação (editar, excluir, duplicar)
+        const acoesCell = linha.insertCell();
+        acoesCell.innerHTML = `
+            <button onclick="editarLancamento(${lancamento.id})">✏️</button>
+            <button onclick="excluirLancamento(${lancamento.id})">🗑️</button>
+            <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
+        `;
+    });
+}
 
-            if(chartM) chartM.destroy();
-            if(chartA) chartA.destroy();
+// Certifique-se de que esta função seja chamada quando a página carregar ou os dados forem atualizados
+document.addEventListener('DOMContentLoaded', renderizarTabelaLancamentos);
+// Script para a Ferramenta de Duplicação Mensal (Recorrência)
 
-            chartM = new Chart(ctxM, {
-                type: 'bar',
-                data: {
-                    labels: ['Receitas', 'Despesas', 'Investimentos'],
-                    datasets: [{
-                        label: 'Valores Liquidados (Pagos)',
-                        data: [r, d, i],
-                        backgroundColor: ['#22c55e', '#ef4444', '#3b82f6']
-                    }]
-                }
-            });
+// Função para duplicar um lançamento específico para o mês seguinte
+function duplicarLancamento(id) {
+    // Recupera todos os lançamentos do localStorage
+    let lancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+    // Encontra o lançamento que se deseja duplicar pelo seu ID
+    const lancamentoOriginal = lancamentos.find(lancamento => lancamento.id === id);
 
-            chartA = new Chart(ctxA, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Receitas', 'Despesas', 'Metas'],
-                    datasets: [{
-                        data: [r * 12, d * 12, i * 12],
-                        backgroundColor: ['#4ade80', '#f87171', '#60a5fa']
-                    }]
-                }
-            });
-        }
+    if (lancamentoOriginal) {
+        // Converte a data original para um objeto Date
+        const dataOriginal = new Date(lancamentoOriginal.data);
+        // Calcula a data para o mês seguinte, mantendo o dia
+        const proximoMes = new Date(dataOriginal.getFullYear(), dataOriginal.getMonth() + 1, dataOriginal.getDate());
 
-        // --- SISTEMA DINÂMICO DE CHAVE DE API ---
-        function obterChaveAPI() {
-            let chave = localStorage.getItem('gemini_api_key');
-            if (!chave) {
-                chave = prompt("Insira sua chave de API do Gemini (deve começar com AIzaSy):");
-                if (chave && chave.trim().startsWith("AIzaSy")) {
-                    localStorage.setItem('gemini_api_key', chave.trim());
-                } else if (chave) {
-                    alert("Formato de chave inválido! Chaves válidas do Gemini começam com AIzaSy.");
-                    return null;
-                }
-            }
-            return chave;
-        }
+        // Cria um novo objeto de lançamento, copiando as propriedades do original
+        const novoLancamentoDuplicado = {
+            ...lancamentoOriginal, // Copia todas as propriedades (descrição, valor, tipo, etc.)
+            id: Date.now() + Math.random(), // Gera um novo ID único para evitar conflitos
+            data: proximoMes.toISOString().split('T')[0], // Define a data para o próximo mês no formato YYYY-MM-DD
+            status: 'pendente' // Define o status padrão como 'pendente' para o novo lançamento
+        };
 
-        document.getElementById('btn-limpar-chave').addEventListener('click', () => {
-            localStorage.removeItem('gemini_api_key');
-            alert("Chave removida da memória local. Você poderá inserir uma nova chave no próximo clique de análise.");
+        // Adiciona o novo lançamento duplicado à lista de lançamentos
+        lancamentos.push(novoLancamentoDuplicado);
+        // Salva a lista atualizada de volta no localStorage
+        localStorage.setItem('lancamentos', JSON.stringify(lancamentos));
+        // Atualiza a exibição da tabela para mostrar o novo lançamento
+        renderizarTabelaLancamentos(); // Assumindo que esta função existe e atualiza a tabela
+        alert('Lançamento duplicado para o próximo mês com status Pendente!');
+    } else {
+        // Exibe um alerta se o lançamento original não for encontrado
+        alert('Lançamento não encontrado para duplicação.');
+    }
+}
+
+// Esta função pode ser chamada pelo botão "➕" na sua tabela de lançamentos.
+// Exemplo de como o botão estaria no HTML da célula de ações:
+// <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
+
+// Certifique-se de que a função renderizarTabelaLancamentos esteja definida e acessível,
+// pois ela é responsável por atualizar a interface após a duplicação.
+// Exemplo:
+// document.addEventListener('DOMContentLoaded', renderizarTabelaLancamentos);
+// Script para o Filtro de Competência Mensal
+
+// Elemento do input de data (tipo mês)
+const inputCompetencia = document.getElementById('filtroCompetencia'); // Assumindo um input com id="filtroCompetencia"
+
+// Elemento que contém a tabela de lançamentos (ex: tbody)
+const tabelaLancamentosBody = document.getElementById('tabelaLancamentosBody'); // Assumindo um tbody com id="tabelaLancamentosBody"
+
+// Listener para o evento 'change' no input de competência
+inputCompetencia.addEventListener('change', function() {
+    // Obtém a data selecionada no formato YYYY-MM
+    const competenciaSelecionada = this.value;
+
+    // Filtra e re-renderiza a tabela
+    filtrarLancamentosPorCompetencia(competenciaSelecionada);
+});
+
+// Função para filtrar os lançamentos pela competência (mês/ano)
+function filtrarLancamentosPorCompetencia(competencia) {
+    // Busca todos os lançamentos do localStorage
+    let todosLancamentos = JSON.parse(localStorage.getItem('lancamentos')) || [];
+
+    let lancamentosFiltrados = [];
+
+    if (!competencia) {
+        // Se nenhuma competência estiver selecionada, mostra todos os lançamentos
+        lancamentosFiltrados = todosLancamentos;
+    } else {
+        // Filtra os lançamentos que correspondem à competência selecionada
+        lancamentosFiltrados = todosLancamentos.filter(lancamento => {
+            // Extrai o ano e mês da data do lançamento
+            const dataLancamento = new Date(lancamento.data);
+            const anoLancamento = dataLancamento.getFullYear();
+            const mesLancamento = (dataLancamento.getMonth() + 1).toString().padStart(2, '0'); // Mês é 0-indexado, adiciona padding
+
+            // Cria uma string no formato YYYY-MM para comparação
+            const competenciaLancamento = `${anoLancamento}-${mesLancamento}`;
+
+            // Compara com a competência selecionada
+            return competenciaLancamento === competencia;
         });
+    }
 
-        // --- CHAMADA DA IA ---
-        document.getElementById('btn-analise-ia').addEventListener('click', async () => {
-            const output = document.getElementById('ia-output');
-            
-            const GEMINI_API_KEY = obterChaveAPI();
-            if (!GEMINI_API_KEY) {
-                output.innerText = "Operação cancelada ou chave inválida. Insira uma chave válida do Gemini para prosseguir.";
-                return;
-            }
+    // Re-renderiza a tabela com os lançamentos filtrados
+    renderizarTabelaFiltrada(lancamentosFiltrados);
+}
 
-            output.innerText = "Pensando e analisando suas finanças... Por favor, aguarde.";
+// Função para renderizar a tabela com os lançamentos filtrados
+function renderizarTabelaFiltrada(lancamentosParaRenderizar) {
+    // Limpa o corpo da tabela atual
+    tabelaLancamentosBody.innerHTML = '';
 
-            const contextoFinancas = JSON.stringify(transacoes);
-            const prompt = `Abaixo estão os dados financeiros de um usuário em formato JSON, contendo flags de "pago" (true ou false) indicando o status da transação. Forneça uma análise resumida, direta e com insights práticos em português. Alerte-o sobre contas pendentes importantes se houver, avalie a saúde financeira do que já foi realizado e dê dicas de economia. Dados: ${contextoFinancas}`;
+    // Ordena os lançamentos filtrados por data (mais recentes primeiro)
+    lancamentosParaRenderizar.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                
-                const data = await response.json();
-                
-                if (data.candidates && data.candidates[0].content.parts[0].text) {
-                    output.innerText = data.candidates[0].content.parts[0].text;
-                } else {
-                    output.innerText = "Erro na resposta da IA. Certifique-se de usar uma chave correta iniciada em AIzaSy e ativa no Google AI Studio.";
-                }
-            } catch (error) {
-                output.innerText = "Erro ao conectar com a API. Verifique sua conexão ou validade do token.";
-            }
+    // Itera sobre os lançamentos filtrados e os adiciona à tabela
+    lancamentosParaRenderizar.forEach(lancamento => {
+        const linha = tabelaLancamentosBody.insertRow();
+        linha.dataset.lancamentoId = lancamento.id; // Adiciona ID para referência
+
+        const dataCell = linha.insertCell();
+        dataCell.textContent = new Date(lancamento.data).toLocaleDateString('pt-BR');
+
+        const descricaoCell = linha.insertCell();
+        descricaoCell.textContent = lancamento.descricao;
+
+        const categoriaCell = linha.insertCell();
+        categoriaCell.textContent = lancamento.categoria || '-'; // Exibe '-' se não houver categoria
+
+        const tipoCell = linha.insertCell();
+        tipoCell.textContent = lancamento.tipo.replace('_', ' '); // Melhora a leitura do tipo
+
+        const valorCell = linha.insertCell();
+        const valorFormatado = parseFloat(lancamento.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        valorCell.textContent = valorFormatado;
+        if (lancamento.tipo.startsWith('pagamento') || lancamento.tipo === 'meta' || lancamento.tipo === 'investimento') {
+            valorCell.style.color = 'red';
+        } else {
+            valorCell.style.color = 'green';
+        }
+
+        // Renderiza o botão de status (assumindo que a função existe e está acessível)
+        renderizarBotoesStatus(lancamento, linha); // Chama a função do ControleStatus.js
+
+        // Célula para botões de ação
+        const acoesCell = linha.insertCell();
+        acoesCell.innerHTML = `
+            <button onclick="editarLancamento(${lancamento.id})">✏️</button>
+            <button onclick="excluirLancamento(${lancamento.id})">🗑️</button>
+            <button onclick="duplicarLancamento(${lancamento.id})">➕</button>
+        `;
+    });
+}
+
+// Função auxiliar para inicializar o filtro com o mês/ano atual
+function inicializarFiltroCompetencia() {
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = (hoje.getMonth() + 1).toString().padStart(2, '0'); // Mês é 0-indexado
+    const competenciaAtual = `${anoAtual}-${mesAtual}`;
+
+    // Define o valor do input de competência para o mês atual
+    const input = document.getElementById('filtroCompetencia');
+    if (input) {
+        input.value = competenciaAtual;
+        // Chama o filtro com a competência atual para carregar os dados corretos inicialmente
+        filtrarLancamentosPorCompetencia(competenciaAtual);
+    } else {
+        // Se o input não existir, apenas renderiza todos os lançamentos (sem filtro inicial)
+        renderizarTabelaFiltrada(JSON.parse(localStorage.getItem('lancamentos')) || []);
+    }
+}
+
+// Inicializa o filtro quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', inicializarFiltroCompetencia);
+
+// Nota: As funções `renderizarBotoesStatus`, `editarLancamento`, `excluirLancamento`,
+// `duplicarLancamento`, e `renderizarTabelaLancamentos` (ou uma versão similar que
+// renderize a tabela completa) devem estar definidas e acessíveis para que este script funcione corretamente.
+// Elas são geralmente encontradas em outros arquivos como ControleStatus.js, GerenciadorEstado.js, etc.
+// Script para o Sistema de Abas Lateral
+
+// Seleciona todos os elementos que representam as abas
+const abas = document.querySelectorAll('.aba');
+// Seleciona todos os conteúdos das abas
+const conteudosAba = document.querySelectorAll('.conteudo-aba');
+
+// Adiciona um listener de evento a cada aba
+abas.forEach(aba => {
+    aba.addEventListener('click', () => {
+        // Remove a classe 'ativa' de todas as abas
+        abas.forEach(a => a.classList.remove('ativa'));
+        // Adiciona a classe 'ativa' à aba clicada
+        aba.classList.add('ativa');
+
+        // Esconde todos os conteúdos de aba
+        conteudosAba.forEach(c => c.classList.remove('ativa'));
+
+        // Mostra o conteúdo de aba correspondente à aba clicada
+        // Usa o atributo 'data-aba' para ligar a aba ao seu conteúdo
+        const idConteudo = aba.getAttribute('data-aba');
+        document.getElementById(idConteudo).classList.add('ativa');
+    });
+});
+
+// Opcional: Ativar a primeira aba por padrão ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    if (abas.length > 0) {
+        // Simula um clique na primeira aba para ativar seu conteúdo
+        abas[0].click();
+    }
+});
+
+// Exemplo de como o HTML das abas e conteúdos pode ser estruturado:
+/*
+<nav class="menu-lateral">
+    <div class="aba ativa" data-aba="aba-financas">Finanças 💰</div>
+    <div class="aba" data-aba="aba-sincronizacao">Sincronização/Backup 🔄</div>
+    <div class="aba" data-aba="aba-ia">Inteligência Artificial ✨</div>
+</nav>
+
+<div class="conteudo-abas">
+    <div id="aba-financas" class="conteudo-aba ativa">
+        <!-- Conteúdo da aba Finanças aqui -->
+        <h1>Painel Financeiro</h1>
+        <p>Todos os seus lançamentos e resumos.</p>
+    </div>
+    <div id="aba-sincronizacao" class="conteudo-aba">
+        <!-- Conteúdo da aba Sincronização/Backup aqui -->
+        <h1>Sincronização e Backup</h1>
+        <p>Opções para exportar e importar dados.</p>
+    </div>
+    <div id="aba-ia" class="conteudo-aba">
+        <!-- Conteúdo da aba Inteligência Artificial aqui -->
+        <h1>Inteligência Artificial</h1>
+        <p>Análises e sugestões inteligentes.</p>
+    </div>
+</div>
+*/
+// Script para a Exportação de Relatórios (PDF e JSON)
+
+// Assumindo que você tenha uma biblioteca como jsPDF para gerar PDFs
+// Se não tiver, você precisará instalá-la: npm install jspdf
+// E importá-la: import { jsPDF } from "jspdf";
+
+// Função para gerar e exportar o relatório em PDF
+async function exportarParaPDF() {
+    // 1. Obter os dados filtrados do mês atual (ou do período selecionado)
+    const competenciaSelecionada = document.getElementById('filtroCompetencia')?.value; // Pega a competência do filtro
+    let lancamentosParaExportar = JSON.parse(localStorage.getItem('lancamentos')) || [];
+
+    if (competenciaSelecionada) {
+        // Filtra os lançamentos para a competência selecionada, se houver
+        lancamentosParaExportar = lancamentosParaExportar.filter(lancamento => {
+            const dataLancamento = new Date(lancamento.data);
+            const anoLancamento = dataLancamento.getFullYear();
+            const mesLancamento = (dataLancamento.getMonth() + 1).toString().padStart(2, '0');
+            const competenciaLancamento = `${anoLancamento}-${mesLancamento}`;
+            return competenciaLancamento === competenciaSelecionada;
         });
+    } else {
+        // Se não houver competência selecionada, usa todos os lançamentos ou avisa o usuário
+        // Para este exemplo, usaremos todos os lançamentos se nenhum filtro estiver ativo.
+        // Uma melhoria seria forçar a seleção de competência para o PDF.
+        console.warn("Nenhuma competência selecionada. Exportando todos os lançamentos disponíveis.");
+    }
 
-        atualizarSistema();
-    </script>
-</body>
-</html>
+    // 2. Gerar o conteúdo do PDF
+    // Usando jsPDF (exemplo básico)
+    const { jsPDF } = window.jspdf; // Assumindo que jspdf está carregado globalmente
+    const doc = new jsPDF();
+
+    // Adiciona um título ao documento
+    doc.setFontSize(18);
+    doc.text("Relatório Financeiro", 10, 10);
+    doc.setFontSize(12);
+    if (competenciaSelecionada) {
+        doc.text(`Competência: ${competenciaSelecionada}`, 10, 20);
+    } else {
+        doc.text("Período: Todos os Registros", 10, 20);
+    
